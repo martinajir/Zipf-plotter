@@ -1,0 +1,12 @@
+library(poweRlaw)
+sink("output.lis")
+data <- scan("/Users/martinajireckova/EE-data.txt")
+distr <- displ$new(data)
+est <- estimate_xmin(distr)
+est
+distr$setXmin(est)
+est <- estimate_pars(distr)
+distr$setPars(est)
+distr$getXmin()
+distr$getPars()
+plot(distr)
