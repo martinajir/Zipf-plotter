@@ -9,9 +9,12 @@
 
 library(shiny)
 library(poweRlaw)
+library(tm)
+library(tau)
+library(readr)
 
 
-# Define UI for application that draws a histogram
+# Define UI for the application
 ui <- fluidPage(
   
   tags$head(tags$link(rel = 'stylesheet', type="text/css", href="stylesheet.css")),
@@ -40,8 +43,23 @@ a(href="https://arxiv.org/pdf/0808.2904.pdf", "extinct ones"), "and has been sho
 for the ", a(href="https://arxiv.org/pdf/1402.2965.pdf", "sizes of cities"), "as well."),
   
 h3("Does it actually hold?"),
-p("Scientists have been disputing whether or not Zipf's law holds in this exact form"),
+p(HTML(paste0("Academics have been disputing whether or not Zipf's law holds in this exact form for quite some time.
+  While some claim that the law ")), 
+  a(href="https://arxiv.org/pdf/cond-mat/0412004.pdf", "holds"), 
+  ", others have been claiming ", 
+  a(href="http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0009411","the opposite")
+  ,"."),
 h3("How to calculate it?"),
+
+p(HTML(paste0("The most commonly used procedure to determine if a power-law is present is plotting a log-log graph of frequency and rank and estimating if the slope is close to −1 by using linear regression. 
+  This would prove that the scaling parameter α is close to 1. This method is however deemed quite limited and not refined enough. 
+  Therefore, Zipf plotter uses a different approach following the procedure by")),
+  a(href="https://arxiv.org/abs/0706.1062", "Clauset, Shalizi and Newman"), 
+  "which was implemented by Colin Gillespie in the ",
+  a(href="https://github.com/csgillespie/poweRlaw", "poweRlaw package"),
+  "First of all the lower bound of power-law behavior x-min has to be determined. 
+  Then, the scaling parameter α is estimated. 
+  Lastly, and most importantly, goodness-of-fit tests are performed to see, whether it is plausible to fit power-law behavior to our empirical data."),
 
   sidebarLayout(
     position = "right",
@@ -49,22 +67,34 @@ h3("How to calculate it?"),
       plotOutput("mainplot"), width=8
     ),
     mainPanel(
-      p("Upload your text", style = "font-family: 'Helvetica'; 
-                                    font-size: 16px"),
+      h2("Upload your text (.txt only)"),
       fileInput("file", h3("File upload")),
       width=4
     )
   ),
   
-  p("output", label = "endtext")
+  plotOutput("endtext")
 )
 
-# Define server logic required to draw a histogram
+# Define server logic
 server <- function(input, output){
-  #output$endtext <- renderText({ 
-    
- # })
   
+  # starting to implement word count
+  output$endtext <- renderPlot({
+    data <- tm::PlainTextDocument(readr::read_lines(input$file$datapath, 
+                              progress = interactive()), heading = "File", id = basename(tempfile()), 
+                              language = "en", description = "example file")
+    
+    data <- tau::textcnt(tm::scan_tokenizer(data), method="string", n=1L, lower=1L)
+    
+    plot(data)
+    
+    
+  })
+  
+  # main Zipf distr plot
+  # now only works when provided with a file containing the
+  # frequencies of words, not words themselves
   output$mainplot <- renderPlot({
     data <- scan(input$file$datapath)
     distr <- displ$new(data)
