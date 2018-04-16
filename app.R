@@ -1,17 +1,53 @@
 #
-# This is a Shiny web application. You can run the application by clicking
-# the 'Run App' button above.
-#
+# This is a Shiny web application.
 # Find out more about building applications with Shiny here:
 #
 #    http://shiny.rstudio.com/
 #
 
+# import libraries
 library(shiny)
 library(poweRlaw)
 library(tm)
 library(tau)
 library(readr)
+
+# define text mining functions
+getWordCount <- function(file){
+  # create corpus
+  data <- tm::PlainTextDocument(readr::read_lines(file, skip=0, n_max=-1L))
+  corpus <- Corpus(VectorSource(data))
+  
+  # clean up input
+  corpus <- tm_map(corpus, removeNumbers)
+  corpus <- tm_map(corpus, content_transformer(tolower))
+  
+  # attempt to replace common punctuation/symbols with space instead
+ # inputTransformer <- content_transformer(content_transformer(function(x, pattern) {return (gsub(pattern, " ", x))}))
+#  corpus <- tm_map(corpus, inputTransformer, "-")
+  #corpus <- tm_map(corpus, inputTransformer, ":")
+  #corpus <- tm_map(corpus, inputTransformer, "/")
+  #corpus <- tm_map(corpus, inputTransformer, ";")
+  #corpus <- tm_map(corpus, inputTransformer, "'")
+  #corpus <- tm_map(corpus, inputTransformer, "¨")
+  
+  corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus, stripWhitespace)
+
+  # create document term matrix, count word frequencies
+  ctrl <- list(removePunctuation = TRUE, 
+               tokenize = "scan", 
+               dictionary = NULL, 
+               stopwords = FALSE, 
+               stemming = FALSE, 
+               removeNumbers = TRUE,
+               wordLengths=c(1, Inf))
+  
+  dtm <- DocumentTermMatrix(corpus, control = ctrl)
+  freq <- termFreq(data, control = ctrl)
+  
+ # counts <- tau::textcnt(tm::scan_tokenizer(data), method="string", n=1L, lower=0L)
+}
 
 
 # Define UI for the application
@@ -81,13 +117,11 @@ server <- function(input, output){
   
   # starting to implement word count
   output$endtext <- renderPlot({
-    data <- tm::PlainTextDocument(readr::read_lines(input$file$datapath, 
-                              progress = interactive()), heading = "File", id = basename(tempfile()), 
-                              language = "en", description = "example file")
+    # data <- tm::PlainTextDocument(readr::read_lines(input$file$datapath, skip=0, n_max=-1L))
     
-    data <- tau::textcnt(tm::scan_tokenizer(data), method="string", n=1L, lower=1L)
-    
-    plot(data)
+    # data <- tau::textcnt(tm::scan_tokenizer(data), method="string", n=1L, lower=1L)
+    wc <- getWordCount(input$file$datapath)
+    plot(wc)
     
     
   })

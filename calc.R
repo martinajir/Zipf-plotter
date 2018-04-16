@@ -10,3 +10,7 @@ distr$setPars(est)
 distr$getXmin()
 distr$getPars()
 plot(distr)
+
+
+data <- tm::PlainTextDocument(readr::read_lines("/Users/martinajireckova/words.txt", skip=0, n_max=-1L))
+corpus <- Corpus(VectorSource(data))
