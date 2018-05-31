@@ -13,7 +13,7 @@ library(tau)
 library(readr)
 
 # define text mining functions
-getWordCount <- function(file){
+getWordCount <- function(file, nameFlag = FALSE){
   # create corpus
   data <- tm::PlainTextDocument(readr::read_lines(file, skip=0, n_max=-1L))
   corpus <- Corpus(VectorSource(data))
@@ -44,9 +44,18 @@ getWordCount <- function(file){
                wordLengths=c(1, Inf))
   
   dtm <- DocumentTermMatrix(corpus, control = ctrl)
-  freq <- termFreq(data, control = ctrl)
   
- # counts <- tau::textcnt(tm::scan_tokenizer(data), method="string", n=1L, lower=0L)
+  # this produces a named vector with words as names and frequencies as values
+  freq <- termFreq(data, control = ctrl)
+  sort.freq <- sort(freq)
+  strippedFreq <- as.numeric(sort.freq) # unname vector
+ 
+   if(nameFlag==TRUE){
+    return(sort.freq)
+  }
+  else {
+    return(strippedFreq)
+  }
 }
 
 
@@ -117,29 +126,25 @@ server <- function(input, output){
   
   # starting to implement word count
   output$endtext <- renderPlot({
-    # data <- tm::PlainTextDocument(readr::read_lines(input$file$datapath, skip=0, n_max=-1L))
-    
-    # data <- tau::textcnt(tm::scan_tokenizer(data), method="string", n=1L, lower=1L)
-    wc <- getWordCount(input$file$datapath)
-    plot(wc)
-    
-    
+    wc <- getWordCount(input$file$datapath, TRUE)
+    plot(y = wc,x = 1:length(wc), ylab = "word frequency", ylim=c(1,max(wc)), xlab = "frequency rank")
+    #xlab=names(wc)
   })
   
   # main Zipf distr plot
-  # now only works when provided with a file containing the
-  # frequencies of words, not words themselves
   output$mainplot <- renderPlot({
-    data <- scan(input$file$datapath)
+    # this used to work when provided with just frequencies
+    # data <- scan(input$file$datapath)
+    data <- getWordCount(input$file$datapath)
     distr <- displ$new(data)
     est <- estimate_xmin(distr)
-    est
+    # est debugging
     distr$setXmin(est)
     est <- estimate_pars(distr)
     distr$setPars(est)
     distr$getXmin()
     distr$getPars()
-    plot(distr)
+    plot(distr, ylab= "CDF")
     lines(distr, col=2)
   })
   
