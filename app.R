@@ -104,30 +104,46 @@ p(HTML(paste0("The most commonly used procedure to determine if a power-law is p
   a(href="https://github.com/csgillespie/poweRlaw", "poweRlaw package"),
   "First of all the lower bound of power-law behavior x-min has to be determined. 
   Then, the scaling parameter α is estimated. 
-  Lastly, and most importantly, goodness-of-fit tests are performed to see, whether it is plausible to fit power-law behavior to our empirical data."),
+  Lastly, and most importantly, goodness-of-fit tests are performed to see, whether it is plausible to fit power-law behavior to our empirical data.
+  Generally, the higher the p-value is, the more plausible fit the given distribution is. In most cases, if the p-value is above 0.1, we 
+  can consider the proposed distribution a plausible fit."),
 
   sidebarLayout(
     position = "right",
     sidebarPanel(
-      plotOutput("mainplot"), width=8
+      tabsetPanel(type = "tabs",
+                  tabPanel("Frequency/Rank Graph", 
+                           plotOutput("frequencies")
+                  ),
+                  tabPanel("Zipf CDF Graph",
+                           plotOutput("mainplot")
+                           ),
+                  tabPanel("Calculated parameters",
+                           verbatimTextOutput("textOutput")),
+                  tabPanel("Bootstrap p",
+                           plotOutput("bootstrap"))
+                 
+        )
+      , width=8
     ),
+    
     mainPanel(
       h2("Upload your text (.txt only)"),
       fileInput("file", h3("File upload")),
       width=4
     )
-  ),
-  
-  plotOutput("endtext")
+  )
 )
 
 # Define server logic
 server <- function(input, output){
   
   # starting to implement word count
-  output$endtext <- renderPlot({
+  output$frequencies <- renderPlot({
     wc <- getWordCount(input$file$datapath, TRUE)
-    plot(y = wc,x = 1:length(wc), ylab = "word frequency", ylim=c(1,max(wc)), xlab = "frequency rank")
+    plot(y = wc,x = length(wc):1, ylab = "word frequency", ylim=c(1,max(wc)), 
+         xlim=c(1, length(wc)),
+         xlab = "frequency rank")
     #xlab=names(wc)
   })
   
@@ -135,17 +151,41 @@ server <- function(input, output){
   output$mainplot <- renderPlot({
     # this used to work when provided with just frequencies
     # data <- scan(input$file$datapath)
-    data <- getWordCount(input$file$datapath)
-    distr <- displ$new(data)
-    est <- estimate_xmin(distr)
-    # est debugging
+    data2 <<- getWordCount(input$file$datapath)
+    distr <<- displ$new(data2)
+    est <<- estimate_xmin(distr)
+    
+    # debugging  
+    # est 
+    
     distr$setXmin(est)
-    est <- estimate_pars(distr)
-    distr$setPars(est)
+    est2 <<- estimate_pars(distr)
+    distr$setPars(est2)
     distr$getXmin()
     distr$getPars()
     plot(distr, ylab= "CDF")
     lines(distr, col=2)
+    
+  
+    output$textOutput <- renderPrint({
+      print(est);
+      print(est2)
+    })
+    
+    output$bootstrap <- renderPlot({
+      plot(bootstrap_p(distr, no_of_sims = 2500, threads=8))
+      
+    })
+    
+  })
+  output$textOutput <- renderPrint({
+    print(est);
+    print(est2)
+  })
+  
+  output$bootstrap <- renderPlot({
+    plot(bootstrap_p(distr, no_of_sims = 2500, threads=8))
+    
   })
   
 
