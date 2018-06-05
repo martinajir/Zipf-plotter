@@ -165,26 +165,16 @@ server <- function(input, output){
     distr$getPars()
     plot(distr, ylab= "CDF")
     lines(distr, col=2)
-    
-  
-    output$textOutput <- renderPrint({
-      print(est);
-      print(est2)
-    })
-    
-    output$bootstrap <- renderPlot({
-      plot(bootstrap_p(distr, no_of_sims = 2500, threads=8))
-      
-    })
-    
   })
+  
   output$textOutput <- renderPrint({
     print(est);
     print(est2)
   })
   
   output$bootstrap <- renderPlot({
-    plot(bootstrap_p(distr, no_of_sims = 2500, threads=8))
+    #plot(bootstrap_p(distr, no_of_sims = 2500, threads=4))
+    plot(bootstrap_p(distr, no_of_sims=500, threads=4))
     
   })
   

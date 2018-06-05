@@ -1,0 +1,13 @@
+name: Zipf-plotter
+title: Zipf-plotter
+username:
+account: martina-jireckova
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 355620
+bundleId: 1413333
+url: https://martina-jireckova.shinyapps.io/Zipf-plotter/
+when: 1528232323.36731
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: .RData|calc.R|README.md
