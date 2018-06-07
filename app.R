@@ -64,23 +64,35 @@ performPvalueCalc <- function(){
 }
 
 evaluateP <- function(){
-  if (presult$p >= 0.1)
+  if (presult$p >= 0.1) {
+    catflag <<- TRUE
     return(cat("The average calculated p-value for this data set using 500 simulations was ", presult$p, ". ", 
                "This value is larger than or equal to 0.1 and therefore Zipf distribution is a likely fit for this dataset. ",
               "In other words, Zipf's law holds for this text."))
-  else
+  }
+  else {
+    catflag <<- FALSE
     return(cat("The average calculated p-value for this data set using 500 simulations was ", presult$p, ". ",
                "The value is below 0.1 and therefore Zipf distribution is not a likely fit for this dataset. ",
                "In other words, Zipf's law does not hold for this text."))
+  }
+}
+
+evaluateCat <- function(){
+  if(catflag == TRUE)
+    return(TRUE)
+  else
+    return(FALSE)
 }
 
 # Define UI for the application
 ui <- fluidPage(
   
   tags$head(tags$link(rel = 'stylesheet', type="text/css", href="stylesheet.css")),
+  tags$head(tags$title("Zipf plotter")),
   
   titlePanel(h1("To Zipf or not to Zipf", style = "margin-bottom:5px")),
-  p(HTML("Your friendly  neighbourhood Zipf plotter"), style="font-size:14px; color: #808182;"),
+  p(HTML("Your friendly  neighbourhood Zipf plotter"), id="topbottomtext"),
   h3("A little introduction"),
   
 p(withMathJax(HTML(paste0("Zipf's law was first formulated by George Zipf in 
@@ -124,34 +136,36 @@ p(HTML(paste0("The most commonly used procedure to determine if a power-law is p
   can consider the proposed distribution a plausible fit."),
 
   sidebarLayout(
-    position = "right",
+    position = "left",
     sidebarPanel(
+      h3("Upload your text (.txt only)"),
+      fileInput("file", h3("File upload"), accept = c('text/plain', '.txt')),
+      width=4
+    ),
+    
+    mainPanel(
       tabsetPanel(type = "tabs",
                   tabPanel("Wordcloud",
-                           plotOutput("wordcloud")),
+                           plotOutput("wordcloud", height="600px")
+                           ),
                   tabPanel("Frequency/Rank Graph", 
-                           plotOutput("frequencies")
+                           plotOutput("frequencies", height="600px")
                   ),
                   tabPanel("Zipf CDF Graph",
-                           plotOutput("mainplot")
+                           plotOutput("mainplot", height="600px")
                            ),
                   tabPanel("Calculated parameters",
                            verbatimTextOutput("textOutput")),
                   tabPanel("p-value calculation",
-                           plotOutput("bootstrap")),
+                           plotOutput("bootstrap", height= "600px")),
                   tabPanel("Results",
-                           textOutput("results"))
+                           textOutput("results"),
+                           imageOutput("cat"))
                   
                  
         )
-      , width=8
-    ),
-    
-    mainPanel(
-      h2("Upload your text (.txt only)"),
-      fileInput("file", h3("File upload"), accept = c('text/plain', '.txt')),
-      width=4
-    )
+      , width=12
+      )
   )
 )
 
@@ -236,17 +250,25 @@ server <- function(input, output){
       need(presult, "Please wait")
     )
    
-    wordcloud(names(freq), freq=freq, min.freq=1, max.words=100, random.order=FALSE, rot.per=0.3, 
-              colors = brewer.pal(8, "Dark2"), scale=c(4,0.5))
+    wordcloud(names(freq), freq=freq, min.freq=1, max.words=200, random.order=FALSE, rot.per=0.3, 
+              colors = brewer.pal(8, "Dark2"), scale = c(8, 1))
   })
   
   output$results <-renderPrint({
     validate(
-      need(presult, "Please wait")
+      need(controlVar$fileReady, "Please upload a file and then wait for the calculation to finish")
     )
+    
     evaluateP()
-      
+    
   })
+  
+  output$cat <- renderImage({
+    if(evaluateCat()==TRUE)
+      list(src='dependencies/catthumbsup.jpg')
+  }, deleteFile=FALSE
+  )
+
 }
 
 # Run the application 
