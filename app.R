@@ -11,8 +11,8 @@ library(poweRlaw)
 library(tm)
 library(tau)
 library(readr)
+library(wordcloud)
 
-# define text mining functions
 getWordCount <- function(file, nameFlag = FALSE){
   # create corpus
   data <- tm::PlainTextDocument(readr::read_lines(file, skip=0, n_max=-1L))
@@ -21,16 +21,6 @@ getWordCount <- function(file, nameFlag = FALSE){
   # clean up input
   corpus <- tm_map(corpus, removeNumbers)
   corpus <- tm_map(corpus, content_transformer(tolower))
-  
-  # attempt to replace common punctuation/symbols with space instead
- # inputTransformer <- content_transformer(content_transformer(function(x, pattern) {return (gsub(pattern, " ", x))}))
-#  corpus <- tm_map(corpus, inputTransformer, "-")
-  #corpus <- tm_map(corpus, inputTransformer, ":")
-  #corpus <- tm_map(corpus, inputTransformer, "/")
-  #corpus <- tm_map(corpus, inputTransformer, ";")
-  #corpus <- tm_map(corpus, inputTransformer, "'")
-  #corpus <- tm_map(corpus, inputTransformer, "¨")
-  
   corpus <- tm_map(corpus, removePunctuation)
   corpus <- tm_map(corpus, stripWhitespace)
 
@@ -43,10 +33,10 @@ getWordCount <- function(file, nameFlag = FALSE){
                removeNumbers = TRUE,
                wordLengths=c(1, Inf))
   
-  dtm <- DocumentTermMatrix(corpus, control = ctrl)
+  dtm <<- DocumentTermMatrix(corpus, control = ctrl)
   
   # this produces a named vector with words as names and frequencies as values
-  freq <- termFreq(data, control = ctrl)
+  freq <<- termFreq(data, control = ctrl)
   sort.freq <- sort(freq)
   strippedFreq <- as.numeric(sort.freq) # unname vector
  
@@ -58,6 +48,31 @@ getWordCount <- function(file, nameFlag = FALSE){
   }
 }
 
+performCalculation <- function(inputfile){
+  data2 <- getWordCount(inputfile)
+  distr <<- displ$new(data2)
+  est <<- estimate_xmin(distr)
+  # debugging  
+  # est 
+  distr$setXmin(est)
+  est2 <<- estimate_pars(distr)
+  distr$setPars(est2)
+}
+
+performPvalueCalc <- function(){
+  presult <<- bootstrap_p(distr,no_of_sims=500, threads= 4)
+}
+
+evaluateP <- function(){
+  if (presult$p >= 0.1)
+    return(cat("The average calculated p-value for this data set using 500 simulations was ", presult$p, ". ", 
+               "This value is larger than or equal to 0.1 and therefore Zipf distribution is a likely fit for this dataset. ",
+              "In other words, Zipf's law holds for this text."))
+  else
+    return(cat("The average calculated p-value for this data set using 500 simulations was ", presult$p, ". ",
+               "The value is below 0.1 and therefore Zipf distribution is not a likely fit for this dataset. ",
+               "In other words, Zipf's law does not hold for this text."))
+}
 
 # Define UI for the application
 ui <- fluidPage(
@@ -112,6 +127,8 @@ p(HTML(paste0("The most commonly used procedure to determine if a power-law is p
     position = "right",
     sidebarPanel(
       tabsetPanel(type = "tabs",
+                  tabPanel("Wordcloud",
+                           plotOutput("wordcloud")),
                   tabPanel("Frequency/Rank Graph", 
                            plotOutput("frequencies")
                   ),
@@ -120,8 +137,11 @@ p(HTML(paste0("The most commonly used procedure to determine if a power-law is p
                            ),
                   tabPanel("Calculated parameters",
                            verbatimTextOutput("textOutput")),
-                  tabPanel("Bootstrap p",
-                           plotOutput("bootstrap"))
+                  tabPanel("p-value calculation",
+                           plotOutput("bootstrap")),
+                  tabPanel("Results",
+                           textOutput("results"))
+                  
                  
         )
       , width=8
@@ -129,7 +149,7 @@ p(HTML(paste0("The most commonly used procedure to determine if a power-law is p
     
     mainPanel(
       h2("Upload your text (.txt only)"),
-      fileInput("file", h3("File upload")),
+      fileInput("file", h3("File upload"), accept = c('text/plain', '.txt')),
       width=4
     )
   )
@@ -138,47 +158,95 @@ p(HTML(paste0("The most commonly used procedure to determine if a power-law is p
 # Define server logic
 server <- function(input, output){
   
-  # starting to implement word count
+  # control whether a file has been uploaded
+  controlVar <- reactiveValues(fileReady=FALSE)
+  dat <- NULL
+  observeEvent(input$file, {
+    controlVar$fileReady <- FALSE
+    if(is.null(input$file))
+      return()
+    else
+      inFile <<- input$file$datapath
+      controlVar$fileReady <- TRUE
+      # to reset global parameters
+      getWordCount(inFile) 
+      performCalculation(inFile)
+      performPvalueCalc()
+  })
+  
+  # reactive
+  #getCurrentPars <- reactive({
+  #  getWordCount(inFile, TRUE)
+  #})
+  
+  # render word frequency plot
   output$frequencies <- renderPlot({
-    wc <- getWordCount(input$file$datapath, TRUE)
+    validate(
+      need(controlVar$fileReady, "Please upload a file and then wait for the calculation to finish")
+    )
+    
+    wc <- getWordCount(inFile, TRUE)
     plot(y = wc,x = length(wc):1, ylab = "word frequency", ylim=c(1,max(wc)), 
          xlim=c(1, length(wc)),
          xlab = "frequency rank")
-    #xlab=names(wc)
+    
   })
   
-  # main Zipf distr plot
+  # render main Zipf distr plot
   output$mainplot <- renderPlot({
-    # this used to work when provided with just frequencies
-    # data <- scan(input$file$datapath)
-    data2 <<- getWordCount(input$file$datapath)
-    distr <<- displ$new(data2)
-    est <<- estimate_xmin(distr)
-    
-    # debugging  
-    # est 
-    
-    distr$setXmin(est)
-    est2 <<- estimate_pars(distr)
-    distr$setPars(est2)
-    distr$getXmin()
-    distr$getPars()
+    validate(
+      need(controlVar$fileReady, "Please upload a file and then wait for the calculation to finish")
+    )
+    performCalculation(inFile)
     plot(distr, ylab= "CDF")
     lines(distr, col=2)
+    
   })
   
+  # render 3rd tab
   output$textOutput <- renderPrint({
+    validate(
+      need(controlVar$fileReady, "Please upload a file and then wait for the calculation to finish")
+    )
+    
     print(est);
     print(est2)
   })
   
+  # render 4th tab
+  # takes a considerable amount of time
   output$bootstrap <- renderPlot({
-    #plot(bootstrap_p(distr, no_of_sims = 2500, threads=4))
-    plot(bootstrap_p(distr, no_of_sims=500, threads=4))
+    validate(
+      need(controlVar$fileReady, "Please upload a file and then wait for the calculation to finish")
+    )
+    
+    validate(
+      need(presult, "Please wait")
+    )
+    plot(presult)
     
   })
   
 
+  output$wordcloud <- renderPlot({
+    validate(
+      need(controlVar$fileReady, "Please upload a file and then wait for the calculation to finish")
+    )
+    validate(
+      need(presult, "Please wait")
+    )
+   
+    wordcloud(names(freq), freq=freq, min.freq=1, max.words=100, random.order=FALSE, rot.per=0.3, 
+              colors = brewer.pal(8, "Dark2"), scale=c(4,0.5))
+  })
+  
+  output$results <-renderPrint({
+    validate(
+      need(presult, "Please wait")
+    )
+    evaluateP()
+      
+  })
 }
 
 # Run the application 
